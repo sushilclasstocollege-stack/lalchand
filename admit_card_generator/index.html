@@ -122,7 +122,7 @@
     <div class="panel">
       <h2>Student details</h2>
       <label for="roll">Roll No.</label>
-      <input id="roll" placeholder="e.g. 23UCC564" autocomplete="off">
+      <input id="roll" placeholder="Your roll number" autocomplete="off">
       <label for="name">Student Name</label>
       <input id="name" placeholder="As on your ID card">
       <label for="email">Email ID</label>
@@ -131,6 +131,7 @@
         <div>
           <label for="degree">Degree / Branch</label>
           <select id="degree">
+            <option value="" selected disabled>Select</option>
             <option>B.Tech. CSE</option><option>B.Tech. CCE</option><option>B.Tech. ECE</option>
             <option>B.Tech. ME</option><option>B.Tech. CSE (DD)</option><option>B.Tech. ECE (DD)</option>
             <option>M.Tech.</option><option>Ph.D.</option>
@@ -139,6 +140,7 @@
         <div>
           <label for="sem">Semester</label>
           <select id="sem">
+            <option value="" selected disabled>Select</option>
             <option>I</option><option>II</option><option>III</option><option>IV</option>
             <option>V</option><option>VI</option><option>VII</option><option>VIII</option>
           </select>
@@ -155,7 +157,7 @@
       <h2>Subjects</h2>
       <label for="timetable" style="margin-top:0">Timetable</label>
       <select id="timetable" style="margin-bottom:8px"></select>
-      <input id="subjectSearch" placeholder="Search subject, e.g. MMSF">
+      <input id="subjectSearch" placeholder="Search subject">
       <div class="hint" style="margin:-4px 0 8px">The timetable lists abbreviations only. Check each course name and code after ticking.</div>
       <div class="subjects" id="subjectList"></div>
       <div id="clashWarn"></div>
@@ -285,7 +287,6 @@ const $ = id => document.getElementById(id);
 const state = { selected: [], photo: null, photoName: "photo.png", photoBlob: null };
 
 $("session").value = DEFAULT_SESSION;
-$("degree").value = "B.Tech. CCE";
 
 $("roll").addEventListener("input", e => {
   const r = e.target.value.toUpperCase().trim();
@@ -368,7 +369,7 @@ function renderSelected() {
         <button title="Remove" data-rm="${esc(s.id)}">&times;</button></div>
       <div class="when">${s.date}, ${s.time}</div>
       <label>Course name</label><input data-i="${i}" data-f="name" value="${esc(s.name)}">
-      <label>Course code</label><input data-i="${i}" data-f="code" value="${esc(s.code)}" placeholder="e.g. CS2201">
+      <label>Course code</label><input data-i="${i}" data-f="code" value="${esc(s.code)}" placeholder="Course code">
     </div>`).join("");
   $("selected").querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => {
     const v = inp.dataset.f === "code" ? inp.value.toUpperCase() : inp.value;
@@ -497,6 +498,8 @@ function problems() {
   const d = data(), p = [];
   if (!d.roll) p.push("Roll No.");
   if (!d.name) p.push("Student Name");
+  if (!d.degree) p.push("Degree / Branch");
+  if (!d.sem) p.push("Semester");
   if (!state.photo) p.push("Photo");
   if (!d.courses.length) p.push("at least one subject");
   if (d.courses.some(c => !c.code)) p.push("course code for every subject");
