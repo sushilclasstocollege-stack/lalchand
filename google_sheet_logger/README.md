@@ -13,6 +13,6 @@ Each time someone generates an admit card (the **Generate admit card** button), 
 5. Copy the **Web app URL**, which ends in `/exec`.
 6. In `admit_card_generator/index.html`, paste that URL between the quotes in `const LOG_URL = "";`, then commit and push.
 
-The `Downloads` tab is created automatically when the first row arrives.
+Rows go to the **first tab** of the spreadsheet set in `SPREADSHEET_ID` at the top of `Code.gs`. Column headers are added automatically if that tab is empty.
 
 If you edit `Code.gs` later, use **Deploy → Manage deployments → Edit → Version: New version**, so the same URL keeps working.

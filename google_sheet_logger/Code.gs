@@ -1,9 +1,10 @@
 /**
- * Receives one record per admit-card print/download from the generator page
- * and appends it as a row to the "Downloads" tab of this spreadsheet.
+ * Receives one record per generated admit card from the generator page and
+ * appends it as a row to the FIRST tab of the spreadsheet below.
  * Setup steps: see README.md in this folder.
  */
-const SHEET_NAME = "Downloads";
+// The spreadsheet to write to: the long ID in its link, docs.google.com/spreadsheets/d/<ID>/edit
+const SPREADSHEET_ID = "1LQtl2PuK0oNgtvrlLgshnko9oCkGmNq3GcZsgqR5Hsc";
 const HEADERS = ["Time", "Action", "Roll No.", "Name", "Email", "Degree / Branch", "Semester",
                  "Session", "Timetable", "Subjects", "Device"];
 const FIELDS = ["action", "roll", "name", "email", "degree", "sem", "session", "timetable", "subjects", "device"];
@@ -13,10 +14,8 @@ function doPost(e) {
   lock.waitLock(10000);
   try {
     const d = JSON.parse(e.postData.contents);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      sheet = ss.insertSheet(SHEET_NAME);
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
+    if (sheet.getLastRow() === 0) {
       sheet.appendRow(HEADERS);
       sheet.setFrozenRows(1);
       sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight("bold");
