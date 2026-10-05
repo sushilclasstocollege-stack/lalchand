@@ -1,0 +1,134 @@
+% =========================================================================
+%  LNMIIT e-Hall Ticket  --  LaTeX replica of the IITMS-generated PDF
+%  Compile:  xelatex admit_card.tex      (needs Verdana + Arial, e.g. Windows)
+%
+%  Geometry is copied from the original PDF: US Letter page, every
+%  coordinate below is in bp (PDF points) from the TOP-LEFT of the page.
+%  For automatic generation, only the DATA block needs to be filled in.
+% =========================================================================
+\documentclass{article}
+\usepackage[letterpaper,margin=0pt]{geometry}
+\usepackage{fontspec}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usetikzlibrary{calc}
+
+\setmainfont{Verdana}
+\newfontfamily\arialfont{Arial}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\hyphenpenalty=10000 \exhyphenpenalty=10000 % wrap whole words, like the original
+
+% ================================ DATA ===================================
+\newcommand{\RollNo}{23UCC564}
+\newcommand{\StudentName}{KUSHAGRA GARG}
+\newcommand{\EmailID}{23UCC564@lnmiit.ac.in}
+\newcommand{\DegreeBranch}{B.Tech. CCE}
+\newcommand{\Semester}{VII}
+\newcommand{\Session}{Odd Semester 2026-2027 Mid Term}
+\newcommand{\PrintDate}{4-Oct-2026}
+\newcommand{\PhotoFile}{photo.png}
+\newcommand{\LogoFile}{lnmiit_logo.png}
+
+% One line per course: \CourseRow{course name}{course code}{exam date}{exam time}
+\newcommand{\Courses}{%
+  \CourseRow{Multimedia Security and Forensics}{CC4304}{09 Oct 2026}{04:00 PM-05:30 PM}%
+  \CourseRow{An Introduction to Environmental Humanities}{HS4702}{10 Oct 2026}{04:00 PM-05:30 PM}%
+}
+% =========================================================================
+
+% ---- helpers -------------------------------------------------------------
+\newcommand{\fs}{\fontsize{8.2bp}{12bp}\selectfont}       % body font
+\newcommand{\fa}{\arialfont\fontsize{8.9bp}{12bp}\selectfont} % date/time font
+\newcommand{\Pt}[2]{($(current page.north west)+({(#1)*1bp},{-(#2)*1bp})$)} % (x, y-down)
+\tikzset{txt/.style={anchor=base west,inner sep=0pt},
+         ctr/.style={anchor=base,inner sep=0pt}}
+
+% table geometry (column rules and row heights from the original)
+\def\cA{34.25}  \def\cB{254.75} \def\cC{348.5} \def\cD{456.5} \def\cE{558.5}
+\def\TblTop{284}  \def\HeadH{24.2} \def\RowH{36}
+
+\newcount\NRows
+\newcommand{\CourseRow}[4]{%
+  \pgfmathsetmacro\rt{\TblTop+\HeadH+\RowH*\NRows}% row top
+  \pgfmathsetmacro\rb{\rt+21.5}%                   first baseline
+  \draw \Pt{\cA}{\rt+\RowH} -- \Pt{\cE}{\rt+\RowH};
+  \foreach \x in {\cA,\cB,\cC,\cD,\cE} \draw \Pt{\x}{\rt} -- \Pt{\x}{\rt+\RowH};
+  \node[txt,text width=160bp,align=left] at \Pt{36}{\rb} {#1};
+  \node[ctr] at \Pt{296.9}{\rb} {#2};
+  \node[ctr] at \Pt{401.7}{\rt+14.4} {\fa #3};
+  \node[ctr] at \Pt{401.7}{\rt+26.4} {\fa #4};
+  \global\advance\NRows by 1
+}
+
+\begin{document}
+\fs
+\begin{tikzpicture}[remember picture,overlay,line width=1bp]
+  % ---- frame & header rule -------------------------------------------------
+  \draw \Pt{24}{98} -- \Pt{582}{98};
+
+  % ---- institute header ----------------------------------------------------
+  \node[anchor=north west,inner sep=0pt] at \Pt{30}{24}
+       {\includegraphics[width=72bp,height=54bp]{\LogoFile}};
+  \node[txt] at \Pt{187.4}{34.0} {\bfseries THE LNM INSTITUTE OF INFORMATION TECHNOLOGY JAIPUR};
+  \node[txt] at \Pt{196.1}{52.0} {Rupa Ki Nangal, Post-Sumel Via - Jamdoli, Dist: Jaipur - 302031};
+  \node[txt] at \Pt{230.6}{81.8} {\bfseries\underline{Office Of The Controller Of Examination}};
+
+  % ---- title ---------------------------------------------------------------
+  \node[txt] at \Pt{287.5}{125.2} {\bfseries\underline{e-Hall Ticket}};
+  \node[txt] at \Pt{218.2}{143.2} {\bfseries Session : \Session};
+
+  % ---- student details -----------------------------------------------------
+  \foreach \y/\lab/\val in {167.2/{Roll No.}/\RollNo,
+                            185.2/{Student Name}/\StudentName,
+                            203.2/{Email ID}/\EmailID,
+                            221.2/{Degree/ Branch}/\DegreeBranch,
+                            239.2/{Semester}/\Semester}{
+    \node[txt] at \Pt{36}{\y}  {\bfseries\lab};
+    \node[txt] at \Pt{138}{\y} {\bfseries :};
+    \node[txt] at \Pt{156}{\y+0.3} {\val};
+  }
+  \node[anchor=north west,inner sep=0pt] at \Pt{486}{151.5}
+       {\includegraphics[width=72bp,height=78bp]{\PhotoFile}};
+
+  \node[txt,text width=540bp,align=left] at \Pt{36}{257.2}
+       {\bfseries\itshape (Student is advised to check his/her name printed on Hall Ticket.
+        The same will be printed on the Grade Sheet. For any correction, contact the
+        Academic Section)};
+
+  % ---- course table --------------------------------------------------------
+  \draw \Pt{\cA}{\TblTop} -- \Pt{\cE}{\TblTop};
+  \draw \Pt{\cA}{\TblTop+\HeadH} -- \Pt{\cE}{\TblTop+\HeadH};
+  \foreach \x in {\cA,\cB,\cC,\cD,\cE} \draw \Pt{\x}{\TblTop} -- \Pt{\x}{\TblTop+\HeadH};
+  \node[txt] at \Pt{110.2}{299.2} {\bfseries Course Name};
+  \node[txt] at \Pt{269.9}{299.2} {\bfseries Course Code};
+  \node[txt] at \Pt{359.4}{299.2} {\bfseries Exam Date \& Time};
+  \node[txt] at \Pt{478.8}{293.2} {\bfseries Invigilator’s};
+  \node[txt] at \Pt{484.5}{305.2} {\bfseries Signature};
+
+  \NRows=0 \Courses
+  \pgfmathsetmacro\tb{\TblTop+\HeadH+\RowH*\NRows} % table bottom
+
+  % ---- instructions (placed relative to the table bottom) ------------------
+  \node[txt] at \Pt{233.1}{\tb+15.25} {\bfseries Instructions to the candidates};
+  \node[anchor=north west,inner sep=0pt,text width=520bp] at \Pt{35.5}{\tb+39.25-12.5} {%
+    \fs
+    \begin{enumerate}[label=\arabic*.,align=left,leftmargin=11.1bp,labelwidth=8.2bp,
+                      labelsep=2.9bp,itemsep=0pt,parsep=0pt,topsep=0pt,partopsep=0pt]
+      \item No candidate without an e-hall ticket shall be allowed to sit in the Examination Hall.
+      \item If a candidate’s photo is not printed on an e-hall ticket, then the candidate shall not be allowed in the Examination Hall.
+      \item Candidates are advised to report to the examination hall 15 minutes before the commencement of the exam.
+      \item Candidates should not leave the examination hall without handing over their answer book to the invigilator.
+      \item Candidates are not allowed to carry any textual material, printed or written bits of paper, mobile phones, electronic devices, etc., in the examination hall until mentioned by the course instrcutors in the open book exams.
+      \item No signature of the controller of examination is required on the e-hall ticket as it is a computer-generated document.
+      \item If there is any discrepancy in the examination date printed on the e-hall ticket, refer to the duly signed timetable copy on the departmental noticeboard or college website.
+    \end{enumerate}};
+
+  % ---- footer --------------------------------------------------------------
+  % ---- footer + outer frame (both move down with the table) -----------------
+  \node[txt] at \Pt{432}{\tb+191.85} {\bfseries Print Date:};
+  \node[txt] at \Pt{496.8}{\tb+192.05} {\PrintDate};
+  \draw \Pt{23.5}{19} rectangle \Pt{583}{\tb+205.85};
+\end{tikzpicture}
+\mbox{}
+\end{document}

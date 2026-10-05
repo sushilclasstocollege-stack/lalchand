@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>e-Hall Ticket Generator</title>
+<style>
+  :root {
+    --bg: #f3f4f6; --panel: #ffffff; --ink: #1f2937; --muted: #6b7280;
+    --line: #d1d5db; --accent: #c2410c; --accent-ink: #ffffff; --warn: #b91c1c;
+    --warn-bg: #fef2f2; --chip: #fff7ed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111827; --panel: #1f2937; --ink: #f3f4f6; --muted: #9ca3af;
+      --line: #374151; --accent: #fb923c; --accent-ink: #111827; --warn: #fca5a5;
+      --warn-bg: #3b1d1d; --chip: #2a2118;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header.top { padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header.top h1 { margin: 0; font-size: 18px; }
+  header.top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 20px; padding: 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; }
+  .panel + .panel { margin-top: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+                  background: var(--panel); color: var(--ink); font: inherit; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  #subjectSearch { margin-bottom: 8px; }
+  .subjects { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+  .day { padding: 6px 10px; font-size: 12px; font-weight: 600; background: var(--bg);
+         position: sticky; top: 0; border-bottom: 1px solid var(--line); }
+  .subj { display: flex; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+  .subj input { width: auto; margin: 0; }
+  .subj .slot { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .subj.clash { color: var(--warn); }
+
+  .course { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 10px; background: var(--chip); }
+  .course .head { display: flex; justify-content: space-between; font-weight: 600; font-size: 13px; }
+  .course .head button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .course .when { color: var(--muted); font-size: 12px; }
+  .warn { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 8px 10px; font-size: 13px; margin-top: 10px; }
+  .empty { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  button.btn { padding: 9px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
+               color: var(--ink); font: inherit; cursor: pointer; }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  .preview-wrap { background: #9ca3af; border-radius: 10px; padding: 16px; overflow: hidden; }
+  .scaler { transform-origin: top left; }
+
+  /* ===== the hall ticket: absolute layout copied from the IITMS PDF (pt, top-left origin) ===== */
+  .card { position: relative; width: 612pt; height: 792pt; background: #fff; color: #000;
+          font-family: Verdana, Geneva, sans-serif; font-size: 8.2pt; line-height: 12pt; }
+  .card * { position: absolute; margin: 0; white-space: nowrap; }
+  .card .b { font-weight: bold; }
+  .card .u { text-decoration: underline; text-underline-offset: 1.5pt; }
+  .card .ar { font-family: Arial, Helvetica, sans-serif; font-size: 8.9pt; }
+  .card .wrap { white-space: normal; }
+  .card .hline { height: 0; border-top: 1pt solid #000; }
+  .card .vline { width: 0; border-left: 1pt solid #000; }
+  .card .frame { border: 1pt solid #000; }
+  .card .photo { object-fit: cover; background: #eee; }
+  .card .ins { white-space: normal; padding-left: 11.1pt; text-indent: -11.1pt; position: static; }
+  .card .insbox { white-space: normal; }
+
+  @media print {
+    @page { size: letter; margin: 0; }
+    body { background: #fff; }
+    header.top, .controls, .actions, .no-print { display: none !important; }
+    main { display: block; padding: 0; }
+    .preview-wrap { padding: 0; background: none; border-radius: 0; height: auto !important; }
+    .card { height: 780pt; overflow: hidden; }
+    .scaler { transform: none !important; height: auto !important; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>e-Hall Ticket Generator</h1>
+  <p>Mid Term Exam, Odd Semester 2026-27. Fill in your details, tick your subjects, then print or download.</p>
+</header>
+
+<main>
+  <section class="controls">
+    <div class="panel">
+      <h2>Student details</h2>
+      <label for="roll">Roll No.</label>
+      <input id="roll" placeholder="e.g. 23UCC564" autocomplete="off">
+      <label for="name">Student Name</label>
+      <input id="name" placeholder="As on your ID card">
+      <label for="email">Email ID</label>
+      <input id="email" placeholder="filled from roll no.">
+      <div class="row2">
+        <div>
+          <label for="degree">Degree / Branch</label>
+          <select id="degree">
+            <option>B.Tech. CSE</option><option>B.Tech. CCE</option><option>B.Tech. ECE</option>
+            <option>B.Tech. ME</option><option>B.Tech. CSE (DD)</option><option>B.Tech. ECE (DD)</option>
+            <option>M.Tech.</option><option>Ph.D.</option>
+          </select>
+        </div>
+        <div>
+          <label for="sem">Semester</label>
+          <select id="sem">
+            <option>I</option><option>II</option><option>III</option><option>IV</option>
+            <option>V</option><option>VI</option><option>VII</option><option>VIII</option>
+          </select>
+        </div>
+      </div>
+      <label for="photo">Photo</label>
+      <input id="photo" type="file" accept="image/*">
+      <div class="hint">Passport-size photo. Stays in your browser; nothing is uploaded.</div>
+      <label for="session">Session</label>
+      <input id="session">
+    </div>
+
+    <div class="panel">
+      <h2>Subjects</h2>
+      <label for="timetable" style="margin-top:0">Timetable</label>
+      <select id="timetable" style="margin-bottom:8px"></select>
+      <input id="subjectSearch" placeholder="Search subject, e.g. MMSF">
+      <div class="hint" style="margin:-4px 0 8px">The timetable lists abbreviations only. Check each course name and code after ticking.</div>
+      <div class="subjects" id="subjectList"></div>
+      <div id="clashWarn"></div>
+      <div id="selected"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="actions">
+      <button class="btn primary" id="printBtn">Print / Save as PDF</button>
+      <button class="btn" id="texBtn">Download LaTeX (.tex)</button>
+    </div>
+    <div class="preview-wrap" id="previewWrap">
+      <div class="scaler" id="scaler"><div class="card" id="card"></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// Timetables (Odd Semester 2026-27 Mid Term)
+//   main: "Mid Term Time Table - Odd Semester 2026-27 - updated.pdf"
+//   a3:   "A3 Section - Mid Term Time Table - Odd Semester 2026-27.pdf"
+// Each day lists its subjects per slot, in the order printed in the PDF.
+// ---------------------------------------------------------------------------
+const TIMETABLES = {
+  main: {
+    label: "All students (regular timetable)",
+    slots: { S1: "10:00 AM-11:30 AM", S2: "01:30 PM-03:00 PM", S3: "04:00 PM-05:30 PM" },
+    days: [
+      { date: "05 Oct 2026", label: "Monday, October 05, 2026",
+        S1: ["ASM","CLP","IME"],
+        S2: ["CM","COA (CCE)","COA (CSE)","DIVP","DSN","EEM","EQICPQR (PhD)","IDS (LICAI)",
+             "PSPBCI (PhD)","RCTSPP (PhD)","RE","SML","UAVCN"],
+        S3: ["AI (CSE)","AI (LICAI)","ELTECH","ITC"] },
+      { date: "06 Oct 2026", label: "Tuesday, October 06, 2026",
+        S1: ["ADS","CODE","INDWEL","PR (LICAI)","QCQI","QM I"],
+        S2: ["CC","DBMS/IDBMS","DCS","ESMP","MFML","MOS"],
+        S3: ["DTE/MD-2","POU","PTS"] },
+      { date: "07 Oct 2026", label: "Wednesday, October 07, 2026",
+        S1: ["AMP","COMMAT","DIGMAN","DW","CAP (PhD)","FLTDI","MAS (M.Tech ECE)","SEMI","TCE"],
+        S2: ["AESPG (PhD)","AIS (PhD)","FEM (PhD)","GAN","GENMOD (PhD)","IEM","ML","NT",
+             "P&S","P&S (LICAI)","PRA (PhD)"],
+        S3: ["IBD","STBE","WCOM (CCE)","WCOM (ECE)"] },
+      { date: "08 Oct 2026", label: "Thursday, October 08, 2026",
+        S1: ["EL","MASYS (LICAI)","MDC","PPA","PPS/CP"],
+        S2: ["AMS (PhD)","CMSF (PhD)","CVIP (PhD)","DC","DENG","DFT","ELDY-II","FDS","NAS",
+             "OOP (CSE)","OOP (LICAI)"],
+        S3: ["CSS","DSP (CCE)","DSP (ECE)","ET","FNFT","IIP"] },
+      { date: "09 Oct 2026", label: "Friday, October 09, 2026",
+        S1: ["AESD","BE","CALC/M-I","CMOS","KIS (LICAI)","M-III","MFCS","MP-I","NLP","NPP"],
+        S2: ["AGT","CSE","DAA (CSE)","DAA (LICAI)","MASMT","MVIB","SNA"],
+        S3: ["MAM","MMSF","ROBCON","SWE","WELCAS"] },
+      { date: "10 Oct 2026", label: "Saturday, October 10, 2026",
+        S1: ["AIPT","AWC","CMP-II","COMP","DL (PE)","DL (LICAI)","IAIDS","IGCN","RBD",
+             "S&S (CCE)","S&S (ECE + CSE)"],
+        S2: ["CV","HT","ITD","IoTFT","LIC","MAWD (LICAI)","MICROI","MMD","REST","SC","SUSDEV","TQM","WSN"],
+        S3: ["AIEH","CEC","HECO"] },
+    ],
+  },
+  a3: {
+    label: "Y26 - A3 Section (B.Tech & B.Tech-M.Tech Integrated)",
+    slots: { S1: "10:30 AM-12:00 PM" },
+    days: [
+      { date: "12 Oct 2026", label: "Monday, October 12, 2026",    S1: ["BE"] },
+      { date: "13 Oct 2026", label: "Tuesday, October 13, 2026",   S1: ["CLP"] },
+      { date: "14 Oct 2026", label: "Wednesday, October 14, 2026", S1: ["TCE"] },
+      { date: "15 Oct 2026", label: "Thursday, October 15, 2026",  S1: ["CODE"] },
+      { date: "16 Oct 2026", label: "Friday, October 16, 2026",
+        S1: ["PPS","Introduction to Plasma Physics (PhD)","Quantum Condensed Matter Field Theory (PhD)"] },
+    ],
+  },
+};
+// The timetables only give abbreviations. Full names are filled in only where
+// the abbreviation is unambiguous (the student can edit them); everything else
+// starts as the abbreviation. Codes are known only for the courses confirmed
+// from a real hall ticket; all others are typed in.
+const FULL = {
+  "MMSF": "Multimedia Security and Forensics",
+  "AIEH": "An Introduction to Environmental Humanities",
+  "COA (CCE)": "Computer Organization and Architecture",
+  "COA (CSE)": "Computer Organization and Architecture",
+  "DBMS/IDBMS": "Database Management Systems",
+  "DAA (CSE)": "Design and Analysis of Algorithms",
+  "DAA (LICAI)": "Design and Analysis of Algorithms",
+  "OOP (CSE)": "Object Oriented Programming",
+  "OOP (LICAI)": "Object Oriented Programming",
+  "AI (CSE)": "Artificial Intelligence",
+  "AI (LICAI)": "Artificial Intelligence",
+  "DSP (CCE)": "Digital Signal Processing",
+  "DSP (ECE)": "Digital Signal Processing",
+  "S&S (CCE)": "Signals and Systems",
+  "S&S (ECE + CSE)": "Signals and Systems",
+  "P&S": "Probability and Statistics",
+  "P&S (LICAI)": "Probability and Statistics",
+  "ML": "Machine Learning",
+  "NLP": "Natural Language Processing",
+  "SWE": "Software Engineering",
+  "CV": "Computer Vision",
+  "SNA": "Social Network Analysis",
+  "DL (PE)": "Deep Learning",
+  "DL (LICAI)": "Deep Learning",
+  "WCOM (CCE)": "Wireless Communication",
+  "WCOM (ECE)": "Wireless Communication",
+};
+const CODES = { "MMSF": "CC4304", "AIEH": "HS4702" };
+const DEFAULT_SESSION = "Odd Semester 2026-2027 Mid Term";
+
+// flatten: one entry per subject, id is unique across timetables
+const SUBJECTS = [];
+Object.entries(TIMETABLES).forEach(([tt, t]) => t.days.forEach((d, di) =>
+  Object.keys(t.slots).forEach(s => (d[s] || []).forEach(abbr =>
+    SUBJECTS.push({ id: tt + ":" + abbr, tt, abbr, day: di, date: d.date,
+                    time: t.slots[s], slot: d.date + " " + s })))));
+const byId = id => SUBJECTS.find(x => x.id === id);
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const state = { selected: [], photo: null, photoName: "photo.png", photoBlob: null };
+
+$("session").value = DEFAULT_SESSION;
+$("degree").value = "B.Tech. CCE";
+
+$("roll").addEventListener("input", e => {
+  const r = e.target.value.toUpperCase().trim();
+  e.target.value = r;
+  if (!$("email").dataset.touched) $("email").value = r ? r + "@lnmiit.ac.in" : "";
+  render();
+});
+$("email").addEventListener("input", e => { e.target.dataset.touched = "1"; render(); });
+["name","degree","sem","session"].forEach(id => $(id).addEventListener("input", render));
+$("name").addEventListener("change", e => { e.target.value = e.target.value.toUpperCase(); render(); });
+$("photo").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  state.photoBlob = f;
+  state.photoName = "photo." + (f.name.split(".").pop() || "png").toLowerCase();
+  const r = new FileReader();
+  r.onload = () => { state.photo = r.result; render(); };
+  r.readAsDataURL(f);
+});
+$("subjectSearch").addEventListener("input", renderList);
+
+$("timetable").innerHTML = Object.entries(TIMETABLES)
+  .map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join("");
+$("timetable").addEventListener("change", () => {
+  state.selected = []; renderList(); renderSelected(); render();
+});
+
+function toggle(id, on) {
+  if (on) {
+    const s = byId(id);
+    state.selected.push({ ...s, name: FULL[s.abbr] || s.abbr, code: CODES[s.abbr] || "" });
+    state.selected.sort((a, b) => SUBJECTS.indexOf(byId(a.id)) - SUBJECTS.indexOf(byId(b.id)));
+  } else {
+    state.selected = state.selected.filter(x => x.id !== id);
+  }
+  renderList(); renderSelected(); render();
+}
+
+function clashes() {
+  const by = {};
+  state.selected.forEach(s => (by[s.slot] = by[s.slot] || []).push(s.abbr));
+  return Object.values(by).filter(v => v.length > 1);
+}
+
+function renderList() {
+  const tt = $("timetable").value, t = TIMETABLES[tt];
+  const q = $("subjectSearch").value.trim().toLowerCase();
+  const taken = new Set(state.selected.map(s => s.id));
+  const slotsTaken = new Set(state.selected.map(s => s.slot));
+  let html = "";
+  t.days.forEach((d, di) => {
+    const items = SUBJECTS.filter(s => s.tt === tt && s.day === di &&
+      (!q || s.abbr.toLowerCase().includes(q) || (FULL[s.abbr] || "").toLowerCase().includes(q)));
+    if (!items.length) return;
+    html += `<div class="day">${d.label}</div>`;
+    items.forEach(s => {
+      const on = taken.has(s.id);
+      const clash = !on && slotsTaken.has(s.slot);
+      html += `<label class="subj${clash ? " clash" : ""}" title="${esc(FULL[s.abbr] || s.abbr)}">
+        <input type="checkbox" data-id="${esc(s.id)}" ${on ? "checked" : ""}>
+        ${esc(s.abbr)}<span class="slot">${s.time.split("-")[0]}</span></label>`;
+    });
+  });
+  $("subjectList").innerHTML = html || `<div class="empty" style="padding:8px 10px">No subject matches.</div>`;
+  $("subjectList").querySelectorAll("input").forEach(cb =>
+    cb.addEventListener("change", () => toggle(cb.dataset.id, cb.checked)));
+  const c = clashes();
+  $("clashWarn").innerHTML = c.length
+    ? `<div class="warn">Time clash: ${c.map(g => g.map(esc).join(" and ")).join("; ")} are in the same slot.</div>` : "";
+}
+
+function renderSelected() {
+  if (!state.selected.length) {
+    $("selected").innerHTML = `<div class="empty">Tick your subjects above.</div>`; return;
+  }
+  $("selected").innerHTML = state.selected.map((s, i) => `
+    <div class="course">
+      <div class="head"><span>${esc(s.abbr)}</span>
+        <button title="Remove" data-rm="${esc(s.id)}">&times;</button></div>
+      <div class="when">${s.date}, ${s.time}</div>
+      <label>Course name</label><input data-i="${i}" data-f="name" value="${esc(s.name)}">
+      <label>Course code</label><input data-i="${i}" data-f="code" value="${esc(s.code)}" placeholder="e.g. CS2201">
+    </div>`).join("");
+  $("selected").querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => {
+    const v = inp.dataset.f === "code" ? inp.value.toUpperCase() : inp.value;
+    if (inp.dataset.f === "code") inp.value = v;
+    state.selected[+inp.dataset.i][inp.dataset.f] = v; render();
+  }));
+  $("selected").querySelectorAll("[data-rm]").forEach(b =>
+    b.addEventListener("click", () => toggle(b.dataset.rm, false)));
+}
+
+// ---------------------------------------------------------------------------
+// Card rendering (coordinates in pt from the original PDF; y = baseline)
+// ---------------------------------------------------------------------------
+const ASC = 9.2;   // baseline offset inside a 12pt line box
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+const T  = (x, y, html, cls = "") => `<div class="${cls}" style="left:${x}pt;top:${y - ASC}pt">${html}</div>`;
+const TC = (cx, y, html, cls = "") => `<div class="${cls}" style="left:${cx - 100}pt;top:${y - ASC}pt;width:200pt;text-align:center">${html}</div>`;
+const HL = (x1, x2, y) => `<div class="hline" style="left:${x1}pt;top:${y - .5}pt;width:${x2 - x1}pt"></div>`;
+const VL = (x, y1, y2) => `<div class="vline" style="left:${x - .5}pt;top:${y1}pt;height:${y2 - y1}pt"></div>`;
+
+const COLS = [34.25, 254.75, 348.5, 456.5, 558.5];
+const TOP = 284, HEAD = 24.2, ROWH = 36;
+const INSTR = [
+  "No candidate without an e-hall ticket shall be allowed to sit in the Examination Hall.",
+  "If a candidate’s photo is not printed on an e-hall ticket, then the candidate shall not be allowed in the Examination Hall.",
+  "Candidates are advised to report to the examination hall 15 minutes before the commencement of the exam.",
+  "Candidates should not leave the examination hall without handing over their answer book to the invigilator.",
+  "Candidates are not allowed to carry any textual material, printed or written bits of paper, mobile phones, electronic devices, etc., in the examination hall until mentioned by the course instrcutors in the open book exams.",
+  "No signature of the controller of examination is required on the e-hall ticket as it is a computer-generated document.",
+  "If there is any discrepancy in the examination date printed on the e-hall ticket, refer to the duly signed timetable copy on the departmental noticeboard or college website.",
+];
+
+function printDate() {
+  const d = new Date(), m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${d.getDate()}-${m[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+function data() {
+  return {
+    roll: $("roll").value.trim(), name: $("name").value.trim().toUpperCase(),
+    email: $("email").value.trim(), degree: $("degree").value, sem: $("sem").value,
+    session: $("session").value.trim(), date: printDate(), courses: state.selected,
+  };
+}
+
+function render() {
+  const d = data();
+  let h = "";
+  // frame + header
+  h += HL(24, 582, 98);
+  h += `<img src="${LOGO}" alt="" style="left:30pt;top:24pt;width:72pt;height:54pt">`;
+  h += T(187.4, 34, "THE LNM INSTITUTE OF INFORMATION TECHNOLOGY JAIPUR", "b");
+  h += T(196.1, 52, "Rupa Ki Nangal, Post-Sumel Via - Jamdoli, Dist: Jaipur - 302031");
+  h += T(230.6, 81.8, "Office Of The Controller Of Examination", "b u");
+  h += T(287.5, 125.2, "e-Hall Ticket", "b u");
+  h += TC(322.2, 143.2, "Session : " + esc(d.session), "b");
+  // details
+  [["Roll No.", d.roll], ["Student Name", d.name], ["Email ID", d.email],
+   ["Degree/ Branch", d.degree], ["Semester", d.sem]].forEach(([k, v], i) => {
+    const y = 167.2 + 18 * i;
+    h += T(36, y, k, "b") + T(138, y, ":", "b") + T(156, y + .3, esc(v));
+  });
+  h += state.photo
+    ? `<img class="photo" src="${state.photo}" alt="" style="left:486pt;top:151.5pt;width:72pt;height:78pt">`
+    : `<div class="photo" style="left:486pt;top:151.5pt;width:72pt;height:78pt;display:flex;align-items:center;justify-content:center;color:#888;font-size:7pt">PHOTO</div>`;
+  h += `<div class="b wrap" style="left:36pt;top:${257.2 - ASC}pt;width:540pt;font-style:italic">(Student is advised to check his/her name printed on Hall Ticket. The same will be printed on the Grade Sheet. For any correction, contact the Academic Section)</div>`;
+  // table head
+  h += HL(COLS[0], COLS[4], TOP) + HL(COLS[0], COLS[4], TOP + HEAD);
+  COLS.forEach(x => h += VL(x, TOP, TOP + HEAD));
+  h += T(110.2, 299.2, "Course Name", "b") + T(269.9, 299.2, "Course Code", "b")
+     + T(359.4, 299.2, "Exam Date &amp; Time", "b")
+     + T(478.8, 293.2, "Invigilator’s", "b") + T(484.5, 305.2, "Signature", "b");
+  // rows
+  d.courses.forEach((c, i) => {
+    const rt = TOP + HEAD + ROWH * i;
+    h += HL(COLS[0], COLS[4], rt + ROWH);
+    COLS.forEach(x => h += VL(x, rt, rt + ROWH));
+    h += `<div class="wrap" style="left:36pt;top:${rt + 21.5 - ASC}pt;width:160pt">${esc(c.name)}</div>`;
+    h += TC(296.9, rt + 21.5, esc(c.code));
+    h += TC(401.7, rt + 14.4, c.date, "ar") + TC(401.7, rt + 26.4, c.time, "ar");
+  });
+  const tb = TOP + HEAD + ROWH * d.courses.length;
+  // instructions
+  h += T(233.1, tb + 15.25, "Instructions to the candidates", "b");
+  h += `<div class="insbox" style="left:36pt;top:${tb + 39.25 - ASC}pt;width:520pt">` +
+       INSTR.map((t, i) => `<div class="ins">${i + 1}.&nbsp;${t}</div>`).join("") + `</div>`;
+  // footer + outer frame move down with the table
+  h += T(432, tb + 191.85, "Print Date:", "b") + T(496.8, tb + 192.05, d.date);
+  h += `<div class="frame" style="left:23.5pt;top:19pt;width:559.5pt;height:${tb + 186.85}pt"></div>`;
+  cardH = tb + 215;
+  $("card").innerHTML = h;
+  fit();
+}
+
+let cardH = 600; // visible card height in pt, updated by render()
+function fit() {
+  const wrap = $("previewWrap"), sc = $("scaler");
+  const w = wrap.clientWidth - 32, cardW = 612 * 96 / 72, hPx = cardH * 96 / 72;
+  const k = Math.min(1, w / cardW);
+  sc.style.transform = `scale(${k})`;
+  sc.style.height = hPx * k + "px";
+  wrap.style.height = hPx * k + 32 + "px";
+}
+window.addEventListener("resize", fit);
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+function problems() {
+  const d = data(), p = [];
+  if (!d.roll) p.push("Roll No.");
+  if (!d.name) p.push("Student Name");
+  if (!state.photo) p.push("Photo");
+  if (!d.courses.length) p.push("at least one subject");
+  if (d.courses.some(c => !c.code)) p.push("course code for every subject");
+  return p;
+}
+function confirmReady() {
+  const p = problems();
+  return !p.length || confirm("Missing: " + p.join(", ") + ".\nContinue anyway?");
+}
+
+$("printBtn").addEventListener("click", () => {
+  if (!confirmReady()) return;
+  const t = document.title; document.title = "Admit_Card_" + (data().roll || "student");
+  window.print(); document.title = t;
+});
+
+function tex(s) {
+  const map = { "\\": "\\textbackslash{}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}" };
+  return String(s).replace(/[\\~^&%$#_{}]/g, c => map[c] || "\\" + c);
+}
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("texBtn").addEventListener("click", () => {
+  if (!confirmReady()) return;
+  const d = data();
+  const rows = d.courses.map(c =>
+    `  \\CourseRow{${tex(c.name)}}{${tex(c.code)}}{${c.date}}{${c.time}}%`).join("\n");
+  const vals = { ROLL: tex(d.roll), NAME: tex(d.name), EMAIL: tex(d.email), DEGREE: tex(d.degree),
+                 SEM: tex(d.sem), SESSION: tex(d.session), DATE: d.date, PHOTO: state.photoName, ROWS: rows };
+  const src = TEX_TEMPLATE.replace(/@@([A-Z]+)@@/g, (m, k) => k in vals ? vals[k] : m);
+  download("admit_card.tex", new Blob([src], { type: "text/x-tex" }));
+  setTimeout(() => fetch(LOGO).then(r => r.blob()).then(b => download("lnmiit_logo.png", b)), 300);
+  if (state.photoBlob) setTimeout(() => download(state.photoName, state.photoBlob), 600);
+});
+
+const TEX_TEMPLATE = String.raw`% =========================================================================
+%  LNMIIT e-Hall Ticket  --  LaTeX replica of the IITMS-generated PDF
+%  Compile:  xelatex admit_card.tex      (needs Verdana + Arial, e.g. Windows)
+%
+%  Geometry is copied from the original PDF: US Letter page, every
+%  coordinate below is in bp (PDF points) from the TOP-LEFT of the page.
+%  For automatic generation, only the DATA block needs to be filled in.
+% =========================================================================
+\documentclass{article}
+\usepackage[letterpaper,margin=0pt]{geometry}
+\usepackage{fontspec}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usetikzlibrary{calc}
+
+\setmainfont{Verdana}
+\newfontfamily\arialfont{Arial}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\hyphenpenalty=10000 \exhyphenpenalty=10000 % wrap whole words, like the original
+
+% ================================ DATA ===================================
+\newcommand{\RollNo}{@@ROLL@@}
+\newcommand{\StudentName}{@@NAME@@}
+\newcommand{\EmailID}{@@EMAIL@@}
+\newcommand{\DegreeBranch}{@@DEGREE@@}
+\newcommand{\Semester}{@@SEM@@}
+\newcommand{\Session}{@@SESSION@@}
+\newcommand{\PrintDate}{@@DATE@@}
+\newcommand{\PhotoFile}{@@PHOTO@@}
+\newcommand{\LogoFile}{lnmiit_logo.png}
+
+% One line per course: \CourseRow{course name}{course code}{exam date}{exam time}
+\newcommand{\Courses}{%
+@@ROWS@@
+}
+% =========================================================================
+
+% ---- helpers -------------------------------------------------------------
+\newcommand{\fs}{\fontsize{8.2bp}{12bp}\selectfont}       % body font
+\newcommand{\fa}{\arialfont\fontsize{8.9bp}{12bp}\selectfont} % date/time font
+\newcommand{\Pt}[2]{($(current page.north west)+({(#1)*1bp},{-(#2)*1bp})$)} % (x, y-down)
+\tikzset{txt/.style={anchor=base west,inner sep=0pt},
+         ctr/.style={anchor=base,inner sep=0pt}}
+
+% table geometry (column rules and row heights from the original)
+\def\cA{34.25}  \def\cB{254.75} \def\cC{348.5} \def\cD{456.5} \def\cE{558.5}
+\def\TblTop{284}  \def\HeadH{24.2} \def\RowH{36}
+
+\newcount\NRows
+\newcommand{\CourseRow}[4]{%
+  \pgfmathsetmacro\rt{\TblTop+\HeadH+\RowH*\NRows}% row top
+  \pgfmathsetmacro\rb{\rt+21.5}%                   first baseline
+  \draw \Pt{\cA}{\rt+\RowH} -- \Pt{\cE}{\rt+\RowH};
+  \foreach \x in {\cA,\cB,\cC,\cD,\cE} \draw \Pt{\x}{\rt} -- \Pt{\x}{\rt+\RowH};
+  \node[txt,text width=160bp,align=left] at \Pt{36}{\rb} {#1};
+  \node[ctr] at \Pt{296.9}{\rb} {#2};
+  \node[ctr] at \Pt{401.7}{\rt+14.4} {\fa #3};
+  \node[ctr] at \Pt{401.7}{\rt+26.4} {\fa #4};
+  \global\advance\NRows by 1
+}
+
+\begin{document}
+\fs
+\begin{tikzpicture}[remember picture,overlay,line width=1bp]
+  % ---- frame & header rule -------------------------------------------------
+  \draw \Pt{24}{98} -- \Pt{582}{98};
+
+  % ---- institute header ----------------------------------------------------
+  \node[anchor=north west,inner sep=0pt] at \Pt{30}{24}
+       {\includegraphics[width=72bp,height=54bp]{\LogoFile}};
+  \node[txt] at \Pt{187.4}{34.0} {\bfseries THE LNM INSTITUTE OF INFORMATION TECHNOLOGY JAIPUR};
+  \node[txt] at \Pt{196.1}{52.0} {Rupa Ki Nangal, Post-Sumel Via - Jamdoli, Dist: Jaipur - 302031};
+  \node[txt] at \Pt{230.6}{81.8} {\bfseries\underline{Office Of The Controller Of Examination}};
+
+  % ---- title ---------------------------------------------------------------
+  \node[txt] at \Pt{287.5}{125.2} {\bfseries\underline{e-Hall Ticket}};
+  \node[ctr] at \Pt{322.2}{143.2} {\bfseries Session : \Session};
+
+  % ---- student details -----------------------------------------------------
+  \foreach \y/\lab/\val in {167.2/{Roll No.}/\RollNo,
+                            185.2/{Student Name}/\StudentName,
+                            203.2/{Email ID}/\EmailID,
+                            221.2/{Degree/ Branch}/\DegreeBranch,
+                            239.2/{Semester}/\Semester}{
+    \node[txt] at \Pt{36}{\y}  {\bfseries\lab};
+    \node[txt] at \Pt{138}{\y} {\bfseries :};
+    \node[txt] at \Pt{156}{\y+0.3} {\val};
+  }
+  \node[anchor=north west,inner sep=0pt] at \Pt{486}{151.5}
+       {\includegraphics[width=72bp,height=78bp]{\PhotoFile}};
+
+  \node[txt,text width=540bp,align=left] at \Pt{36}{257.2}
+       {\bfseries\itshape (Student is advised to check his/her name printed on Hall Ticket.
+        The same will be printed on the Grade Sheet. For any correction, contact the
+        Academic Section)};
+
+  % ---- course table --------------------------------------------------------
+  \draw \Pt{\cA}{\TblTop} -- \Pt{\cE}{\TblTop};
+  \draw \Pt{\cA}{\TblTop+\HeadH} -- \Pt{\cE}{\TblTop+\HeadH};
+  \foreach \x in {\cA,\cB,\cC,\cD,\cE} \draw \Pt{\x}{\TblTop} -- \Pt{\x}{\TblTop+\HeadH};
+  \node[txt] at \Pt{110.2}{299.2} {\bfseries Course Name};
+  \node[txt] at \Pt{269.9}{299.2} {\bfseries Course Code};
+  \node[txt] at \Pt{359.4}{299.2} {\bfseries Exam Date \& Time};
+  \node[txt] at \Pt{478.8}{293.2} {\bfseries Invigilator’s};
+  \node[txt] at \Pt{484.5}{305.2} {\bfseries Signature};
+
+  \NRows=0 \Courses
+  \pgfmathsetmacro\tb{\TblTop+\HeadH+\RowH*\NRows} % table bottom
+
+  % ---- instructions (placed relative to the table bottom) ------------------
+  \node[txt] at \Pt{233.1}{\tb+15.25} {\bfseries Instructions to the candidates};
+  \node[anchor=north west,inner sep=0pt,text width=520bp] at \Pt{35.5}{\tb+39.25-12.5} {%
+    \fs
+    \begin{enumerate}[label=\arabic*.,align=left,leftmargin=11.1bp,labelwidth=8.2bp,
+                      labelsep=2.9bp,itemsep=0pt,parsep=0pt,topsep=0pt,partopsep=0pt]
+      \item No candidate without an e-hall ticket shall be allowed to sit in the Examination Hall.
+      \item If a candidate’s photo is not printed on an e-hall ticket, then the candidate shall not be allowed in the Examination Hall.
+      \item Candidates are advised to report to the examination hall 15 minutes before the commencement of the exam.
+      \item Candidates should not leave the examination hall without handing over their answer book to the invigilator.
+      \item Candidates are not allowed to carry any textual material, printed or written bits of paper, mobile phones, electronic devices, etc., in the examination hall until mentioned by the course instrcutors in the open book exams.
+      \item No signature of the controller of examination is required on the e-hall ticket as it is a computer-generated document.
+      \item If there is any discrepancy in the examination date printed on the e-hall ticket, refer to the duly signed timetable copy on the departmental noticeboard or college website.
+    \end{enumerate}};
+
+  % ---- footer --------------------------------------------------------------
+  % ---- footer + outer frame (both move down with the table) -----------------
+  \node[txt] at \Pt{432}{\tb+191.85} {\bfseries Print Date:};
+  \node[txt] at \Pt{496.8}{\tb+192.05} {\PrintDate};
+  \draw \Pt{23.5}{19} rectangle \Pt{583}{\tb+205.85};
+\end{tikzpicture}
+\mbox{}
+\end{document}
+`;
+const LOGO = "data:image/png;base64,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";
+
+renderList(); renderSelected(); render();
+</script>
+</body>
+</html>
