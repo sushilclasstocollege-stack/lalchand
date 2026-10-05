@@ -401,10 +401,9 @@ const INSTR = [
   "If there is any discrepancy in the examination date printed on the e-hall ticket, refer to the duly signed timetable copy on the departmental noticeboard or college website.",
 ];
 
-function printDate() {
-  const d = new Date(), m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${d.getDate()}-${m[d.getMonth()]}-${d.getFullYear()}`;
-}
+// Fixed print date shown on every admit card (same as the official IITMS tickets).
+const PRINT_DATE = "4-Oct-2026";
+function printDate() { return PRINT_DATE; }
 
 function data() {
   return {
