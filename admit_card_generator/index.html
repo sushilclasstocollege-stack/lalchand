@@ -59,6 +59,13 @@
   .preview-wrap { background: #9ca3af; border-radius: 10px; padding: 16px; overflow: hidden; }
   .scaler { transform-origin: top left; }
 
+  /* the card (and Print) only appear after "Generate admit card" */
+  .gen-panel { text-align: center; padding: 48px 24px; }
+  .gen-panel p { color: var(--muted); margin: 0 0 18px; }
+  .gen-panel .btn { padding: 12px 22px; font-size: 15px; }
+  body:not(.show-card) .actions, body:not(.show-card) .preview-wrap { display: none; }
+  body.show-card .gen-panel { display: none; }
+
   /* ===== the hall ticket: absolute layout copied from the IITMS PDF (pt, top-left origin) ===== */
   .card { position: relative; width: 612pt; height: 792pt; background: #fff; color: #000;
           font-family: Verdana, Geneva, sans-serif; font-size: 8.2pt; line-height: 12pt; }
@@ -114,7 +121,7 @@
 <body>
 <header class="top">
   <h1>e-Hall Ticket Generator</h1>
-  <p>Mid Term Exam, Odd Semester 2026-27. Fill in your details, tick your subjects, then print or download.</p>
+  <p>Mid Term Exam, Odd Semester 2026-27. Fill in your details, tick your subjects, then generate your admit card.</p>
 </header>
 
 <main>
@@ -167,6 +174,10 @@
   </section>
 
   <section id="output">
+    <div class="panel gen-panel">
+      <p>Fill in your details and tick your subjects, then generate your admit card.</p>
+      <button class="btn primary gen" id="genBtnDesk">Generate admit card</button>
+    </div>
     <div class="actions">
       <button class="btn back" id="backBtn">&larr; Edit details</button>
       <button class="btn primary" id="printBtn">Print / Save as PDF</button>
@@ -526,11 +537,10 @@ function data() {
   };
 }
 
-// On phones the card is not rendered live, only when it is opened (or printed).
+// The card is drawn only after "Generate admit card" (see generate()).
 const mobileMQ = matchMedia("(max-width: 900px)");
-let forceRender = false;
 function render() {
-  if (mobileMQ.matches && !forceRender && !document.body.classList.contains("show-card")) return;
+  if (!document.body.classList.contains("show-card")) return;
   const d = data();
   let h = "";
   // frame + header
@@ -591,18 +601,24 @@ function fit() {
 }
 window.addEventListener("resize", fit);
 
-// phone flow: "Generate admit card" opens the finished card full-screen
-$("genBtn").addEventListener("click", () => {
+// "Generate admit card" shows the finished card (full-screen on phones, beside
+// the form on computers) and sends the usage record. Changing anything in the
+// form afterwards hides the card again, so the record always matches the card.
+function generate() {
   const p = problems();
   if (p.length && !confirm("Missing: " + p.join(", ") + ".\nGenerate anyway?")) return;
   document.body.classList.add("show-card");
   $("output").scrollTop = 0;
   render();
   logUse("Generate");
-});
-$("backBtn").addEventListener("click", () => document.body.classList.remove("show-card"));
-mobileMQ.addEventListener("change", () => { if (!mobileMQ.matches) document.body.classList.remove("show-card"); render(); });
-window.addEventListener("beforeprint", () => { forceRender = true; render(); forceRender = false; });
+}
+$("genBtn").addEventListener("click", generate);
+$("genBtnDesk").addEventListener("click", generate);
+const unGenerate = () => document.body.classList.remove("show-card");
+["input", "change"].forEach(ev => document.querySelector(".controls").addEventListener(ev, unGenerate, true));
+document.querySelector(".controls").addEventListener("click", e => { if (e.target.closest("[data-rm]")) unGenerate(); }, true);
+$("backBtn").addEventListener("click", unGenerate);
+mobileMQ.addEventListener("change", render);
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -617,10 +633,6 @@ function problems() {
   if (!d.courses.length) p.push("at least one subject");
   if (d.courses.some(c => !c.code)) p.push("course code for every subject");
   return p;
-}
-function confirmReady() {
-  const p = problems();
-  return !p.length || confirm("Missing: " + p.join(", ") + ".\nContinue anyway?");
 }
 
 // ---------------------------------------------------------------------------
@@ -643,9 +655,7 @@ function logUse(action) {
 }
 
 $("printBtn").addEventListener("click", () => {
-  if (!confirmReady()) return;
-  // on phones the record was already sent by "Generate admit card"
-  if (!mobileMQ.matches) logUse("Generate (print)");
+  // the record was already sent by "Generate admit card"
   const t = document.title; document.title = "Admit_Card_" + (data().roll || "student");
   window.print(); document.title = t;
 });
