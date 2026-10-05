@@ -162,6 +162,7 @@
       <div class="subjects" id="subjectList"></div>
       <div id="clashWarn"></div>
       <div id="selected"></div>
+      <p class="hint" style="margin-top:12px">Your details and subjects (not your photo) are saved when you generate your admit card.</p>
     </div>
   </section>
 
@@ -169,9 +170,7 @@
     <div class="actions">
       <button class="btn back" id="backBtn">&larr; Edit details</button>
       <button class="btn primary" id="printBtn">Print / Save as PDF</button>
-      <button class="btn" id="texBtn">Download LaTeX (.tex)</button>
     </div>
-    <p class="hint no-print" style="margin:-6px 0 12px">Your details and subjects (not your photo) are saved when you print or download.</p>
     <div class="preview-wrap" id="previewWrap">
       <div class="scaler" id="scaler"><div class="card" id="card"></div></div>
     </div>
@@ -487,6 +486,7 @@ $("genBtn").addEventListener("click", () => {
   document.body.classList.add("show-card");
   $("output").scrollTop = 0;
   render();
+  logUse("Generate");
 });
 $("backBtn").addEventListener("click", () => document.body.classList.remove("show-card"));
 mobileMQ.addEventListener("change", () => { if (!mobileMQ.matches) document.body.classList.remove("show-card"); render(); });
@@ -532,168 +532,12 @@ function logUse(action) {
 
 $("printBtn").addEventListener("click", () => {
   if (!confirmReady()) return;
-  logUse("Print / PDF");
+  // on phones the record was already sent by "Generate admit card"
+  if (!mobileMQ.matches) logUse("Generate (print)");
   const t = document.title; document.title = "Admit_Card_" + (data().roll || "student");
   window.print(); document.title = t;
 });
 
-function tex(s) {
-  const map = { "\\": "\\textbackslash{}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}" };
-  return String(s).replace(/[\\~^&%$#_{}]/g, c => map[c] || "\\" + c);
-}
-function download(name, blob) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-$("texBtn").addEventListener("click", () => {
-  if (!confirmReady()) return;
-  logUse("LaTeX download");
-  const d = data();
-  const rows = d.courses.map(c =>
-    `  \\CourseRow{${tex(c.name)}}{${tex(c.code)}}{${c.date}}{${c.time}}%`).join("\n");
-  const vals = { ROLL: tex(d.roll), NAME: tex(d.name), EMAIL: tex(d.email), DEGREE: tex(d.degree),
-                 SEM: tex(d.sem), SESSION: tex(d.session), DATE: d.date, PHOTO: state.photoName, ROWS: rows };
-  const src = TEX_TEMPLATE.replace(/@@([A-Z]+)@@/g, (m, k) => k in vals ? vals[k] : m);
-  download("admit_card.tex", new Blob([src], { type: "text/x-tex" }));
-  setTimeout(() => fetch(LOGO).then(r => r.blob()).then(b => download("lnmiit_logo.png", b)), 300);
-  if (state.photoBlob) setTimeout(() => download(state.photoName, state.photoBlob), 600);
-});
-
-const TEX_TEMPLATE = String.raw`% =========================================================================
-%  LNMIIT e-Hall Ticket  --  LaTeX replica of the IITMS-generated PDF
-%  Compile:  xelatex admit_card.tex      (needs Verdana + Arial, e.g. Windows)
-%
-%  Geometry is copied from the original PDF: US Letter page, every
-%  coordinate below is in bp (PDF points) from the TOP-LEFT of the page.
-%  For automatic generation, only the DATA block needs to be filled in.
-% =========================================================================
-\documentclass{article}
-\usepackage[letterpaper,margin=0pt]{geometry}
-\usepackage{fontspec}
-\usepackage{tikz}
-\usepackage{enumitem}
-\usetikzlibrary{calc}
-
-\setmainfont{Verdana}
-\newfontfamily\arialfont{Arial}
-\pagestyle{empty}
-\setlength{\parindent}{0pt}
-\hyphenpenalty=10000 \exhyphenpenalty=10000 % wrap whole words, like the original
-
-% ================================ DATA ===================================
-\newcommand{\RollNo}{@@ROLL@@}
-\newcommand{\StudentName}{@@NAME@@}
-\newcommand{\EmailID}{@@EMAIL@@}
-\newcommand{\DegreeBranch}{@@DEGREE@@}
-\newcommand{\Semester}{@@SEM@@}
-\newcommand{\Session}{@@SESSION@@}
-\newcommand{\PrintDate}{@@DATE@@}
-\newcommand{\PhotoFile}{@@PHOTO@@}
-\newcommand{\LogoFile}{lnmiit_logo.png}
-
-% One line per course: \CourseRow{course name}{course code}{exam date}{exam time}
-\newcommand{\Courses}{%
-@@ROWS@@
-}
-% =========================================================================
-
-% ---- helpers -------------------------------------------------------------
-\newcommand{\fs}{\fontsize{8.2bp}{12bp}\selectfont}       % body font
-\newcommand{\fa}{\arialfont\fontsize{8.9bp}{12bp}\selectfont} % date/time font
-\newcommand{\Pt}[2]{($(current page.north west)+({(#1)*1bp},{-(#2)*1bp})$)} % (x, y-down)
-\tikzset{txt/.style={anchor=base west,inner sep=0pt},
-         ctr/.style={anchor=base,inner sep=0pt}}
-
-% table geometry (column rules and row heights from the original)
-\def\cA{34.25}  \def\cB{254.75} \def\cC{348.5} \def\cD{456.5} \def\cE{558.5}
-\def\TblTop{284}  \def\HeadH{24.2} \def\RowH{36}
-
-\newcount\NRows
-\newcommand{\CourseRow}[4]{%
-  \pgfmathsetmacro\rt{\TblTop+\HeadH+\RowH*\NRows}% row top
-  \pgfmathsetmacro\rb{\rt+21.5}%                   first baseline
-  \draw \Pt{\cA}{\rt+\RowH} -- \Pt{\cE}{\rt+\RowH};
-  \foreach \x in {\cA,\cB,\cC,\cD,\cE} \draw \Pt{\x}{\rt} -- \Pt{\x}{\rt+\RowH};
-  \node[txt,text width=160bp,align=left] at \Pt{36}{\rb} {#1};
-  \node[ctr] at \Pt{296.9}{\rb} {#2};
-  \node[ctr] at \Pt{401.7}{\rt+14.4} {\fa #3};
-  \node[ctr] at \Pt{401.7}{\rt+26.4} {\fa #4};
-  \global\advance\NRows by 1
-}
-
-\begin{document}
-\fs
-\begin{tikzpicture}[remember picture,overlay,line width=1bp]
-  % ---- frame & header rule -------------------------------------------------
-  \draw \Pt{24}{98} -- \Pt{582}{98};
-
-  % ---- institute header ----------------------------------------------------
-  \node[anchor=north west,inner sep=0pt] at \Pt{30}{24}
-       {\includegraphics[width=72bp,height=54bp]{\LogoFile}};
-  \node[txt] at \Pt{187.4}{34.0} {\bfseries THE LNM INSTITUTE OF INFORMATION TECHNOLOGY JAIPUR};
-  \node[txt] at \Pt{196.1}{52.0} {Rupa Ki Nangal, Post-Sumel Via - Jamdoli, Dist: Jaipur - 302031};
-  \node[txt] at \Pt{230.6}{81.8} {\bfseries\underline{Office Of The Controller Of Examination}};
-
-  % ---- title ---------------------------------------------------------------
-  \node[txt] at \Pt{287.5}{125.2} {\bfseries\underline{e-Hall Ticket}};
-  \node[ctr] at \Pt{322.2}{143.2} {\bfseries Session : \Session};
-
-  % ---- student details -----------------------------------------------------
-  \foreach \y/\lab/\val in {167.2/{Roll No.}/\RollNo,
-                            185.2/{Student Name}/\StudentName,
-                            203.2/{Email ID}/\EmailID,
-                            221.2/{Degree/ Branch}/\DegreeBranch,
-                            239.2/{Semester}/\Semester}{
-    \node[txt] at \Pt{36}{\y}  {\bfseries\lab};
-    \node[txt] at \Pt{138}{\y} {\bfseries :};
-    \node[txt] at \Pt{156}{\y+0.3} {\val};
-  }
-  \node[anchor=north west,inner sep=0pt] at \Pt{486}{151.5}
-       {\includegraphics[width=72bp,height=78bp]{\PhotoFile}};
-
-  \node[txt,text width=540bp,align=left] at \Pt{36}{257.2}
-       {\bfseries\itshape (Student is advised to check his/her name printed on Hall Ticket.
-        The same will be printed on the Grade Sheet. For any correction, contact the
-        Academic Section)};
-
-  % ---- course table --------------------------------------------------------
-  \draw \Pt{\cA}{\TblTop} -- \Pt{\cE}{\TblTop};
-  \draw \Pt{\cA}{\TblTop+\HeadH} -- \Pt{\cE}{\TblTop+\HeadH};
-  \foreach \x in {\cA,\cB,\cC,\cD,\cE} \draw \Pt{\x}{\TblTop} -- \Pt{\x}{\TblTop+\HeadH};
-  \node[txt] at \Pt{110.2}{299.2} {\bfseries Course Name};
-  \node[txt] at \Pt{269.9}{299.2} {\bfseries Course Code};
-  \node[txt] at \Pt{359.4}{299.2} {\bfseries Exam Date \& Time};
-  \node[txt] at \Pt{478.8}{293.2} {\bfseries Invigilator’s};
-  \node[txt] at \Pt{484.5}{305.2} {\bfseries Signature};
-
-  \NRows=0 \Courses
-  \pgfmathsetmacro\tb{\TblTop+\HeadH+\RowH*\NRows} % table bottom
-
-  % ---- instructions (placed relative to the table bottom) ------------------
-  \node[txt] at \Pt{233.1}{\tb+15.25} {\bfseries Instructions to the candidates};
-  \node[anchor=north west,inner sep=0pt,text width=520bp] at \Pt{35.5}{\tb+39.25-12.5} {%
-    \fs
-    \begin{enumerate}[label=\arabic*.,align=left,leftmargin=11.1bp,labelwidth=8.2bp,
-                      labelsep=2.9bp,itemsep=0pt,parsep=0pt,topsep=0pt,partopsep=0pt]
-      \item No candidate without an e-hall ticket shall be allowed to sit in the Examination Hall.
-      \item If a candidate’s photo is not printed on an e-hall ticket, then the candidate shall not be allowed in the Examination Hall.
-      \item Candidates are advised to report to the examination hall 15 minutes before the commencement of the exam.
-      \item Candidates should not leave the examination hall without handing over their answer book to the invigilator.
-      \item Candidates are not allowed to carry any textual material, printed or written bits of paper, mobile phones, electronic devices, etc., in the examination hall until mentioned by the course instrcutors in the open book exams.
-      \item No signature of the controller of examination is required on the e-hall ticket as it is a computer-generated document.
-      \item If there is any discrepancy in the examination date printed on the e-hall ticket, refer to the duly signed timetable copy on the departmental noticeboard or college website.
-    \end{enumerate}};
-
-  % ---- footer --------------------------------------------------------------
-  % ---- footer + outer frame (both move down with the table) -----------------
-  \node[txt] at \Pt{432}{\tb+191.85} {\bfseries Print Date:};
-  \node[txt] at \Pt{496.8}{\tb+192.05} {\PrintDate};
-  \draw \Pt{23.5}{19} rectangle \Pt{583}{\tb+205.85};
-\end{tikzpicture}
-\mbox{}
-\end{document}
-`;
 const LOGO = "data:image/png;base64,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";
 
 renderList(); renderSelected(); render();

@@ -1,6 +1,6 @@
-# Download log (Google Sheet)
+# Usage log (Google Sheet)
 
-Each time someone clicks **Print / Save as PDF** or **Download LaTeX** on the generator, a row is added to a Google Sheet. The row holds the time, the action, their form details and subjects, and their browser/device. Photos are not sent.
+Each time someone generates an admit card (the **Generate admit card** button on phones, or **Print / Save as PDF** on a computer), a row is added to a Google Sheet. The row holds the time, the action, their form details and subjects, and their browser/device. Photos are not sent.
 
 ## Setup (once, about 5 minutes)
 
