@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/admit_card_generator/index.html" }
+  ]
+}

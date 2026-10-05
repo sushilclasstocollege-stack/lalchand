@@ -74,10 +74,36 @@
   .card .ins { white-space: normal; padding-left: 11.1pt; text-indent: -11.1pt; position: static; }
   .card .insbox { white-space: normal; }
 
+  /* ===== phones / narrow screens: no live preview; the card opens full-screen on demand ===== */
+  .mbar, .back { display: none; }
+  @media (max-width: 900px) {
+    header.top { padding: 14px 16px; }
+    main { gap: 0; padding: 16px 16px 96px; }
+    input, select { font-size: 16px; padding: 10px 12px; }          /* stops iOS zoom-on-focus */
+    .subjects { max-height: 50vh; }
+    .subj { padding: 10px 12px; font-size: 15px; }
+    .subj input { width: 18px; height: 18px; }
+    .course .head button { font-size: 22px; padding: 0 4px; }
+    #output { display: none; }
+    .mbar { display: flex; gap: 10px; align-items: center; position: fixed; left: 0; right: 0; bottom: 0;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--panel);
+            border-top: 1px solid var(--line); z-index: 10; }
+    .mbar .count { color: var(--muted); font-size: 13px; }
+    .mbar .btn { margin-left: auto; padding: 12px 18px; font-size: 15px; }
+    body.show-card { overflow: hidden; }
+    body.show-card #output { display: block; position: fixed; inset: 0; z-index: 20; overflow: auto;
+                             background: var(--bg); padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+    body.show-card .mbar { display: none; }
+    .back { display: inline-block; }
+    .actions .btn { flex: 1 1 auto; padding: 12px 14px; }
+    .preview-wrap { padding: 8px; }
+  }
+
   @media print {
     @page { size: letter; margin: 0; }
-    body { background: #fff; }
-    header.top, .controls, .actions, .no-print { display: none !important; }
+    body { background: #fff; overflow: visible !important; }
+    header.top, .controls, .actions, .mbar, .no-print { display: none !important; }
+    #output { display: block !important; position: static !important; padding: 0 !important; overflow: visible !important; }
     main { display: block; padding: 0; }
     .preview-wrap { padding: 0; background: none; border-radius: 0; height: auto !important; }
     .card { height: 780pt; overflow: hidden; }
@@ -137,8 +163,9 @@
     </div>
   </section>
 
-  <section>
+  <section id="output">
     <div class="actions">
+      <button class="btn back" id="backBtn">&larr; Edit details</button>
       <button class="btn primary" id="printBtn">Print / Save as PDF</button>
       <button class="btn" id="texBtn">Download LaTeX (.tex)</button>
     </div>
@@ -147,6 +174,11 @@
     </div>
   </section>
 </main>
+
+<div class="mbar">
+  <span class="count" id="mCount">No subjects selected</span>
+  <button class="btn primary" id="genBtn">Generate admit card</button>
+</div>
 
 <script>
 // ---------------------------------------------------------------------------
@@ -325,7 +357,9 @@ function renderList() {
 }
 
 function renderSelected() {
-  if (!state.selected.length) {
+  const n = state.selected.length;
+  $("mCount").textContent = n ? `${n} subject${n > 1 ? "s" : ""} selected` : "No subjects selected";
+  if (!n) {
     $("selected").innerHTML = `<div class="empty">Tick your subjects above.</div>`; return;
   }
   $("selected").innerHTML = state.selected.map((s, i) => `
@@ -380,7 +414,11 @@ function data() {
   };
 }
 
+// On phones the card is not rendered live, only when it is opened (or printed).
+const mobileMQ = matchMedia("(max-width: 900px)");
+let forceRender = false;
 function render() {
+  if (mobileMQ.matches && !forceRender && !document.body.classList.contains("show-card")) return;
   const d = data();
   let h = "";
   // frame + header
@@ -432,13 +470,26 @@ function render() {
 let cardH = 600; // visible card height in pt, updated by render()
 function fit() {
   const wrap = $("previewWrap"), sc = $("scaler");
-  const w = wrap.clientWidth - 32, cardW = 612 * 96 / 72, hPx = cardH * 96 / 72;
+  const pad = parseFloat(getComputedStyle(wrap).paddingLeft) * 2;
+  const w = wrap.clientWidth - pad, cardW = 612 * 96 / 72, hPx = cardH * 96 / 72;
   const k = Math.min(1, w / cardW);
   sc.style.transform = `scale(${k})`;
   sc.style.height = hPx * k + "px";
-  wrap.style.height = hPx * k + 32 + "px";
+  wrap.style.height = hPx * k + pad + "px";
 }
 window.addEventListener("resize", fit);
+
+// phone flow: "Generate admit card" opens the finished card full-screen
+$("genBtn").addEventListener("click", () => {
+  const p = problems();
+  if (p.length && !confirm("Missing: " + p.join(", ") + ".\nGenerate anyway?")) return;
+  document.body.classList.add("show-card");
+  $("output").scrollTop = 0;
+  render();
+});
+$("backBtn").addEventListener("click", () => document.body.classList.remove("show-card"));
+mobileMQ.addEventListener("change", () => { if (!mobileMQ.matches) document.body.classList.remove("show-card"); render(); });
+window.addEventListener("beforeprint", () => { forceRender = true; render(); forceRender = false; });
 
 // ---------------------------------------------------------------------------
 // Actions
