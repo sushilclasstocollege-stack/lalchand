@@ -148,7 +148,7 @@
       </div>
       <label for="photo">Photo</label>
       <input id="photo" type="file" accept="image/*">
-      <div class="hint">Passport-size photo. Stays in your browser; nothing is uploaded.</div>
+      <div class="hint">Passport-size photo. Used only on your admit card; it is not uploaded.</div>
       <label for="session">Session</label>
       <input id="session">
     </div>
@@ -171,6 +171,7 @@
       <button class="btn primary" id="printBtn">Print / Save as PDF</button>
       <button class="btn" id="texBtn">Download LaTeX (.tex)</button>
     </div>
+    <p class="hint no-print" style="margin:-6px 0 12px">Your details and subjects (not your photo) are saved when you print or download.</p>
     <div class="preview-wrap" id="previewWrap">
       <div class="scaler" id="scaler"><div class="card" id="card"></div></div>
     </div>
@@ -510,8 +511,28 @@ function confirmReady() {
   return !p.length || confirm("Missing: " + p.join(", ") + ".\nContinue anyway?");
 }
 
+// ---------------------------------------------------------------------------
+// Usage log: one row per print/download in a Google Sheet (see google_sheet_logger/).
+// Leave LOG_URL empty to turn logging off.
+// ---------------------------------------------------------------------------
+const LOG_URL = "";
+function logUse(action) {
+  if (!LOG_URL) return;
+  const d = data();
+  const body = JSON.stringify({
+    action, roll: d.roll, name: d.name, email: d.email, degree: d.degree, sem: d.sem,
+    session: d.session, timetable: TIMETABLES[$("timetable").value].label,
+    subjects: d.courses.map(c => `${c.abbr} (${c.code || "no code"}) ${c.date} ${c.time}`).join("; "),
+    device: navigator.userAgent,
+  });
+  // text/plain avoids a CORS preflight, which Apps Script does not answer
+  fetch(LOG_URL, { method: "POST", mode: "no-cors", keepalive: true,
+                   headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).catch(() => {});
+}
+
 $("printBtn").addEventListener("click", () => {
   if (!confirmReady()) return;
+  logUse("Print / PDF");
   const t = document.title; document.title = "Admit_Card_" + (data().roll || "student");
   window.print(); document.title = t;
 });
@@ -527,6 +548,7 @@ function download(name, blob) {
 }
 $("texBtn").addEventListener("click", () => {
   if (!confirmReady()) return;
+  logUse("LaTeX download");
   const d = data();
   const rows = d.courses.map(c =>
     `  \\CourseRow{${tex(c.name)}}{${tex(c.code)}}{${c.date}}{${c.time}}%`).join("\n");
